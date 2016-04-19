@@ -13,6 +13,8 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include "checksum.h"
 extern "C" {
 	#include <linux/netfilter.h>     /* Defines verdicts (NF_ACCEPT, etc) */
@@ -61,8 +63,13 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	struct ip* ip_hdr = (struct ip*) pktData;
 	struct tcphdr * tcp_hdr = (struct tcphdr*) ((unsigned char*)pktData + (ip_hdr->ip_hl << 2));
 	
-	printf("src ip=%d\n",ntohl(ip_hdr->ip_src.s_addr));
-	
+	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
+	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
+	struct in_addr addr;
+	inet_aton("10.0.28.1",&addr);
+	ip_hdr->ip_src = addr;
+
+	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 
 	// For this program we'll always accept the packet...
 	return nfq_set_verdict(myQueue, id, NF_ACCEPT, len, (unsigned char *)ip_hdr);
