@@ -21,6 +21,10 @@ extern "C" {
 	#include <libnetfilter_queue/libnetfilter_queue.h>
 }
 
+struct natent{
+		
+}
+
 /*
  * Callback function installed to netfilter queue
  */
@@ -67,9 +71,32 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
 	struct in_addr addr;
 	inet_aton("10.0.28.1",&addr);
-	ip_hdr->ip_src = addr;
+	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
+		inet_aton("10.0.28.2",&addr);
+		ip_hdr->ip_dst = addr;
+
+		//TODO: SYN, RST packet detection
+		//TODO: NAT TABLE
+		//TODO: handle timeout
+		//TODO: check for first available port
+		//TODO: print NAT TABLE
+
+	} else { //OUTBOUND
+
+		ip_hdr->ip_src = addr;
+
+	}
+
+
+	//tcp_hdr->src_port
+	//tcp_hdr->dst_port
+
 
 	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
+
+	// fix checksums
+	tcp_hdr->ck_sum = tcp_checksum((unsigned char *)tcp_hdr);
+	ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr);
 
 	// For this program we'll always accept the packet...
 	return nfq_set_verdict(myQueue, id, NF_ACCEPT, len, (unsigned char *)ip_hdr);
