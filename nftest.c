@@ -74,6 +74,9 @@ void clear_timeout_entries(){
 		if (table[entry].src_port > 0){
 			if (now.tv_sec - table[entry].tv.tv_sec > 30){
 				// delete entry
+				printf("deleting entry\n");
+				printf("now: %ld then: %ld\n", now.tv_sec, table[entry].tv.tv_sec);
+				printf("seconds difference: %d\n", (int) (now.tv_sec - table[entry].tv.tv_sec));
 				memset(&table[entry], 0, sizeof(struct natent));
 			}
 		}
@@ -122,6 +125,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		printf("  timestamp: nil\n");
 	}*/
 	gettimeofday(&tv, NULL);
+	printf("creating timeval at %ld seconds\n", tv.tv_sec);
 
 	// Print the payload; in copy meta mode, only headers will be
 	// included; in copy packet mode, whole packet will be returned.
@@ -149,7 +153,10 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 
 	struct in_addr addr;
 
-	//	clear_timeout_entries();
+	//clear timed out entries
+	clear_timeout_entries();
+
+
 	inet_aton("10.3.1.28",&addr);//TODO:HACK
 	//int mask_int = atoi(subnet_mask);
 	//unsigned int local_mask = 0xffffffff << (32 – mask_int);
@@ -192,7 +199,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 					if (table[port].src_port == 0) { // valid
 						table[port].src = ip_hdr->ip_src;
 						table[port].src_port = ntohs(tcp_hdr->source);
-						//table[port].tv = tv;
+						table[port].tv = tv;
 						tcp_hdr->source = htons(port);
 						break;
 					}
