@@ -165,13 +165,13 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		puts("INBOUND");
 		inet_aton("10.0.28.1",&addr);
 
-		//TODO: SYN, RST packet detection
-		//TODO: NAT TABLE
+		//TODO: 4-way handshake
+		//TODO: RST packet detection
 		//TODO: handle timeout
-		//TODO: check for first available port
-		//TODO: print NAT TABLE
+		//TODO: program argument and usage
 		int port = ntohs(tcp_hdr->dest);
 		if (port >= start_port && port <= end_port && table[port].src_port != 0){
+			table[port].tv = tv; // UPDATE TIMESTAMP
 			ip_hdr->ip_dst = table[port].src;
 			tcp_hdr->dest = htons(table[port].src_port);
 		} else { // NOT IN PORT RANGE
@@ -190,6 +190,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 
 		if (p <= end_port){ // EXIST PAIR
 			tcp_hdr->source = htons(p);
+			table[p].tv = tv; // UPDATE TIMESTAMP
 
 		}else if (tcp_hdr->syn == 1){ // NO PAIR AND IS SYN
 			puts("SYN");
@@ -198,7 +199,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 				if (table[port].src_port == 0) { // valid
 					table[port].src = ip_hdr->ip_src;
 					table[port].src_port = ntohs(tcp_hdr->source);
-					table[port].tv = tv;
+					table[port].tv = tv; // UPDATE TIMESTAMP
 					tcp_hdr->source = htons(port);
 					break;
 				}
