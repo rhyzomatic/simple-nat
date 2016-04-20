@@ -96,8 +96,6 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 print_table();
 	u_int32_t verdict = NF_ACCEPT;
 	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
-//		inet_aton("10.0.28.2",&addr);
-//		ip_hdr->ip_dst = addr;
 
 		//TODO: SYN, RST packet detection
 		//TODO: NAT TABLE
@@ -118,6 +116,9 @@ print_table();
 				if (table[port].src_port == 0) { // valid
 					table[port].src = ip_hdr->ip_src;
 					table[port].src_port = ntohs(tcp_hdr->source);
+					table[port].tv = tv;
+					tcp_hdr->source = port;
+					break;
 				}
 			}
 		} else { // NOT SYN PACKET
