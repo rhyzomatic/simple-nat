@@ -23,7 +23,7 @@ extern "C" {
 
 struct natent{
 		
-}
+};
 
 /*
  * Callback function installed to netfilter queue
@@ -69,6 +69,8 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	
 	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
+	printf("src port=%d\n",ntohs(tcp_hdr->source));
+	printf("dst port=%d\n",ntohs(tcp_hdr->dest));
 	struct in_addr addr;
 	inet_aton("10.0.28.1",&addr);
 	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
@@ -95,7 +97,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 
 	// fix checksums
-	tcp_hdr->ck_sum = tcp_checksum((unsigned char *)tcp_hdr);
+	tcp_hdr->check = tcp_checksum((unsigned char *)tcp_hdr);
 	ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr);
 
 	// For this program we'll always accept the packet...
