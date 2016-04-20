@@ -10,6 +10,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/time.h>
+
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -30,6 +32,22 @@ struct natent{
 
 #define start_port 10000
 #define end_port 12000
+
+void clear_timeout_entries(){
+	struct timeval now;
+	gettimeofday(&timeval, NULL);
+
+	int entry;
+	for (entry = start_port; entry <= end_port; entry++){
+		if (table[entry].src_port > 0){
+			if (now.tv_sec - table[entry].tv.tv_sec > 30){
+				// delete entry
+				memset(&table[entry], 0, sizeof(natent));
+			}
+		}
+	}
+}
+
 
 /*
  * Callback function installed to netfilter queue
@@ -80,7 +98,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	struct in_addr addr;
 	inet_aton("10.0.28.1",&addr);
 
-	clear_timeout_entry();
+	clear_timeout_entries();
 
 	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
 		inet_aton("10.0.28.2",&addr);
