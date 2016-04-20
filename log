@@ -1,0 +1,189 @@
+----
+----
+----
+pkt recvd:   id: 1
+  hw_protocol: 2048
+  hook: 2
+BEFORE TRANSLATION---
+src ip=10.0.28.2
+dest ip=137.189.90.152
+src port=44678
+dst port=10001
+OUTBOUND
+SYN
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+AFTER---
+src ip=10.3.1.28
+dest ip=137.189.90.152
+src port=10000
+dst port=10001
+----
+----
+----
+pkt recvd:   id: 2
+  hw_protocol: 2048
+  hook: 2
+BEFORE TRANSLATION---
+src ip=10.0.28.2
+dest ip=137.189.90.152
+src port=44678
+dst port=10001
+OUTBOUND
+SYN
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=10.3.1.28
+dest ip=137.189.90.152
+src port=10001
+dst port=10001
+----
+----
+----
+pkt recvd:   id: 3
+  hw_protocol: 2048
+  hook: 0
+BEFORE TRANSLATION---
+src ip=137.189.90.152
+dest ip=10.3.1.28
+src port=10001
+dst port=10001
+INBOUND
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=137.189.90.152
+dest ip=10.0.28.2
+src port=10001
+dst port=44678
+----
+----
+----
+pkt recvd:   id: 4
+  hw_protocol: 2048
+  hook: 2
+BEFORE TRANSLATION---
+src ip=10.0.28.2
+dest ip=137.189.90.152
+src port=44678
+dst port=10001
+OUTBOUND
+NOT SYN
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=10.3.1.28
+dest ip=137.189.90.152
+src port=10000
+dst port=10001
+----
+----
+----
+pkt recvd:   id: 5
+  hw_protocol: 2048
+  hook: 2
+BEFORE TRANSLATION---
+src ip=10.0.28.2
+dest ip=137.189.90.152
+src port=44676
+dst port=10001
+OUTBOUND
+NOT SYN
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=10.3.1.28
+dest ip=137.189.90.152
+src port=44676
+dst port=10001
+----
+----
+----
+pkt recvd:   id: 6
+  hw_protocol: 2048
+  hook: 0
+BEFORE TRANSLATION---
+src ip=137.189.90.152
+dest ip=10.3.1.28
+src port=10001
+dst port=10000
+INBOUND
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=137.189.90.152
+dest ip=10.0.28.2
+src port=10001
+dst port=44678
+----
+----
+----
+pkt recvd:   id: 7
+  hw_protocol: 2048
+  hook: 2
+BEFORE TRANSLATION---
+src ip=10.0.28.2
+dest ip=137.189.90.152
+src port=44678
+dst port=10001
+OUTBOUND
+NOT SYN
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=10.3.1.28
+dest ip=137.189.90.152
+src port=10000
+dst port=10001
+----
+----
+----
+pkt recvd:   id: 8
+  hw_protocol: 2048
+  hook: 0
+BEFORE TRANSLATION---
+src ip=137.189.90.152
+dest ip=10.3.1.28
+src port=10001
+dst port=10001
+INBOUND
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     10001
+AFTER---
+src ip=137.189.90.152
+dest ip=10.0.28.2
+src port=10001
+dst port=44678
+----
+----
+----
+pkt recvd:   id: 9
+  hw_protocol: 2048
+  hook: 2
+BEFORE TRANSLATION---
+src ip=10.0.28.2
+dest ip=137.189.90.152
+src port=44678
+dst port=10001
+OUTBOUND
+NOT SYN
+         SRC IP  SRC PORT        DEST IP DEST PORT
+--------------------------------------------------------------------
+      10.0.28.2     44678      10.0.28.1     10000
+      10.0.28.2     44678      10.0.28.1     1

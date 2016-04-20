@@ -26,12 +26,44 @@ extern "C" {
 struct natent{
 	int src_port;
 	struct in_addr src;	
-//	int dst_port;
+	//	int dst_port;
 	struct timeval tv;
 } table[65536];
 
 #define start_port 10000
 #define end_port 12000
+
+uint16_t ip_checksum(void* vdata,size_t length) {
+	// Cast the data pointer to one that can be indexed.
+	char* data=(char*)vdata;
+
+	// Initialise the accumulator.
+	uint32_t acc=0xffff;
+
+	// Handle complete 16-bit blocks.
+	for (size_t i=0;i+1<length;i+=2) {
+		uint16_t word;
+		memcpy(&word,data+i,2);
+		acc+=ntohs(word);
+		if (acc>0xffff) {
+			acc-=0xffff;
+		}
+	}
+
+	// Handle any partial block at the end of the data.
+	if (length&1) {
+		uint16_t word=0;
+		memcpy(&word,data+length-1,1);
+		acc+=ntohs(word);
+		if (acc>0xffff) {
+			acc-=0xffff;
+		}
+	}
+
+	// Return the checksum in network byte order.
+	return htons(~acc);
+}
+
 
 void clear_timeout_entries(){
 	struct timeval now;
@@ -64,11 +96,13 @@ void remove_entry(int port){
 	memset(&table[port], 0, sizeof(struct natent));
 }
 
+
 /*
  * Callback function installed to netfilter queue
  */
 static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg, 
 		nfq_data* pkt, void *cbData) {
+	printf("----\n----\n----\n");
 	unsigned int id = 0;
 	nfqnl_msg_packet_hdr *header;
 
@@ -83,41 +117,45 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	// print the timestamp (PC: seems the timestamp is not always set)
 	struct timeval tv;
 	if (!nfq_get_timestamp(pkt, &tv)) {
-		printf("  timestamp: %lu.%lu\n", tv.tv_sec, tv.tv_usec);
+		//		printf("  timestamp: %lu.%lu\n", tv.tv_sec, tv.tv_usec);
 	} else {
-		printf("  timestamp: nil\n");
+		//		printf("  timestamp: nil\n");
 	}
 
 	// Print the payload; in copy meta mode, only headers will be
 	// included; in copy packet mode, whole packet will be returned.
-	printf(" payload: ");
+	//	printf(" payload: ");
 	unsigned char *pktData;
 	int len = nfq_get_payload(pkt, (char**)&pktData);
-	if (len > 0) {
+	/*	if (len > 0) {
 		for (int i=0; i<len; ++i) {
-			printf("%02x ", pktData[i]);
+		printf("%02x ", pktData[i]);
 		}
-	}
-	printf("\n");
+		}
+		printf("\n");
 
 	// add a newline at the end
-	printf("\n");
+	printf("\n");*/
 
 	struct ip* ip_hdr = (struct ip*) pktData;
 	struct tcphdr * tcp_hdr = (struct tcphdr*) ((unsigned char*)pktData + (ip_hdr->ip_hl << 2));
 
+	puts("BEFORE TRANSLATION---");
 	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
 	printf("src port=%d\n",ntohs(tcp_hdr->source));
 	printf("dst port=%d\n",ntohs(tcp_hdr->dest));
+
 	struct in_addr addr;
-	inet_aton("10.0.28.1",&addr);
 
-	clear_timeout_entries();
-
-	print_table();
+	//	clear_timeout_entries();
+	inet_aton("10.3.1.28",&addr);//TODO:HACK
+	//int mask_int = atoi(subnet_mask);
+	//unsigned int local_mask = 0xffffffff << (32 – mask_int);
 	u_int32_t verdict = NF_ACCEPT;
-	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
+	if (ip_hdr->ip_dst.s_addr == addr.s_addr) { // INBOUND
+		puts("INBOUND");
+		inet_aton("10.0.28.1",&addr);
 
 		//TODO: SYN, RST packet detection
 		//TODO: NAT TABLE
@@ -127,38 +165,55 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		int port = ntohs(tcp_hdr->dest);
 		if (port >= start_port && port <= end_port && table[port].src_port != 0){
 			ip_hdr->ip_dst = table[port].src;
-			tcp_hdr->dest = table[port].src_port;
+			tcp_hdr->dest = htons(table[port].src_port);
 		} else { // NOT IN PORT RANGE
+			puts("NOT IN PORT RANGE");
 			verdict = NF_DROP;
 		}
 	} else { //OUTBOUND
-		if (ntohs(tcp_hdr->syn) == 1){ // IS SYN PACKET
-			int port;
-			for (port = start_port; port <= end_port; port++){
-				if (table[port].src_port == 0) { // valid
-					table[port].src = ip_hdr->ip_src;
-					table[port].src_port = ntohs(tcp_hdr->source);
-					table[port].tv = tv;
-					tcp_hdr->source = port;
-					break;
+		inet_aton("10.3.1.28",&addr);
+		puts("OUTBOUND");
+		int p;
+		for (p = start_port; p <= end_port; p++){
+			if (table[p].src.s_addr == ip_hdr->ip_src.s_addr && table[p].src_port == ntohs(tcp_hdr->source)) {
+				break;
+			}
+		}
+
+		if (p <= end_port){ // EXIST PAIR
+			tcp_hdr->source = htons(p);
+
+		}else{
+			if (tcp_hdr->syn == 1){ // IS SYN PACKET
+				puts("SYN");
+				int port;
+				for (port = start_port; port <= end_port; port++){
+					if (table[port].src_port == 0) { // valid
+						table[port].src = ip_hdr->ip_src;
+						table[port].src_port = ntohs(tcp_hdr->source);
+						//table[port].tv = tv;
+						tcp_hdr->source = htons(port);
+						break;
+					}
 				}
-			}
-		} else { // NOT SYN PACKET
+			} else { // NOT SYN PACKET
+				puts("NOT SYN");
 
-			//TODO: FIN PACKET
+				//TODO: FIN PACKET
 
-			int port;
-			for (port = start_port; port <= end_port; port++){
-				if (table[port].src.s_addr == ip_hdr->ip_src.s_addr && table[port].src_port == ntohs(tcp_hdr->source)) {
-					break;
+				int port;
+				for (port = start_port; port <= end_port; port++){
+					if (table[port].src.s_addr == ip_hdr->ip_src.s_addr && table[port].src_port == ntohs(tcp_hdr->source)) {
+						break;
+					}
 				}
-			}
-			if (port > end_port) { // NOT IN TABLE
-				verdict = NF_DROP;
-			} else { // IN TABLE
-				tcp_hdr->source = port;
-			}
+				if (port > end_port) { // NOT IN TABLE
+					verdict = NF_DROP;
+				} else { // IN TABLE
+					tcp_hdr->source = htons(port);
+				}
 
+			}
 		}
 		ip_hdr->ip_src = addr;
 
@@ -168,12 +223,19 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	//tcp_hdr->src_port
 	//tcp_hdr->dst_port
 
+	print_table();
 
-	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
+	//printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 
 	// fix checksums
-	tcp_hdr->check = tcp_checksum((unsigned char *)ip_hdr);
 	ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr);
+	//ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr,20);
+	tcp_hdr->check = tcp_checksum((unsigned char *)ip_hdr);
+	puts("AFTER---");
+	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
+	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
+	printf("src port=%d\n",ntohs(tcp_hdr->source));
+	printf("dst port=%d\n",ntohs(tcp_hdr->dest));
 
 	// For this program we'll always accept the packet...
 	return nfq_set_verdict(myQueue, id, verdict, len, (unsigned char *)ip_hdr);
