@@ -85,6 +85,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	if (!nfq_get_timestamp(pkt, &tv)) {
 		printf("  timestamp: %lu.%lu\n", tv.tv_sec, tv.tv_usec);
 	} else {
+		gettimeofday(&tv, NULL);
 		printf("  timestamp: nil\n");
 	}
 
