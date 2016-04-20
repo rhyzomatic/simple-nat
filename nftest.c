@@ -116,11 +116,12 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 
 	// print the timestamp (PC: seems the timestamp is not always set)
 	struct timeval tv;
-	if (!nfq_get_timestamp(pkt, &tv)) {
+	/*if (!nfq_get_timestamp(pkt, &tv)) {
 		//		printf("  timestamp: %lu.%lu\n", tv.tv_sec, tv.tv_usec);
 	} else {
-		//		printf("  timestamp: nil\n");
-	}
+		printf("  timestamp: nil\n");
+	}*/
+	gettimeofday(&tv, NULL);
 
 	// Print the payload; in copy meta mode, only headers will be
 	// included; in copy packet mode, whole packet will be returned.
