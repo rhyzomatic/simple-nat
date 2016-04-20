@@ -10,6 +10,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/time.h>
+
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -31,6 +33,21 @@ struct natent{
 #define start_port 10000
 #define end_port 12000
 
+void clear_timeout_entries(){
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	int entry;
+	for (entry = start_port; entry <= end_port; entry++){
+		if (table[entry].src_port > 0){
+			if (now.tv_sec - table[entry].tv.tv_sec > 30){
+				// delete entry
+				memset(&table[entry], 0, sizeof(struct natent));
+			}
+		}
+	}
+}
+
 void print_table(){
 	printf("%15s%10s%15s%10s\n","SRC IP","SRC PORT","DEST IP", "DEST PORT");
 	printf("--------------------------------------------------------------------\n");
@@ -41,6 +58,10 @@ void print_table(){
 		}
 	}
 
+}
+
+void remove_entry(int port){
+	memset(&table[port], 0, sizeof(struct natent));
 }
 
 /*
@@ -92,8 +113,9 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	struct in_addr addr;
 	inet_aton("10.0.28.1",&addr);
 
-//	clear_timeout_entry();
-print_table();
+	clear_timeout_entries();
+
+	print_table();
 	u_int32_t verdict = NF_ACCEPT;
 	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
 
@@ -110,7 +132,7 @@ print_table();
 			verdict = NF_DROP;
 		}
 	} else { //OUTBOUND
-		if (tcp_hdr->syn == 1){ // IS SYN PACKET
+		if (ntohs(tcp_hdr->syn) == 1){ // IS SYN PACKET
 			int port;
 			for (port = start_port; port <= end_port; port++){
 				if (table[port].src_port == 0) { // valid
