@@ -17,13 +17,19 @@
 #include <arpa/inet.h>
 #include "checksum.h"
 extern "C" {
-	#include <linux/netfilter.h>     /* Defines verdicts (NF_ACCEPT, etc) */
-	#include <libnetfilter_queue/libnetfilter_queue.h>
+#include <linux/netfilter.h>     /* Defines verdicts (NF_ACCEPT, etc) */
+#include <libnetfilter_queue/libnetfilter_queue.h>
 }
 
 struct natent{
-		
-};
+	int src_port;
+	struct in_addr src;	
+	int dst_port;
+	struct timeval tv;
+} table[65536];
+
+#define start_port 10000
+#define end_port 12000
 
 /*
  * Callback function installed to netfilter queue
@@ -66,13 +72,16 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 
 	struct ip* ip_hdr = (struct ip*) pktData;
 	struct tcphdr * tcp_hdr = (struct tcphdr*) ((unsigned char*)pktData + (ip_hdr->ip_hl << 2));
-	
+
 	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
 	printf("src port=%d\n",ntohs(tcp_hdr->source));
 	printf("dst port=%d\n",ntohs(tcp_hdr->dest));
 	struct in_addr addr;
 	inet_aton("10.0.28.1",&addr);
+
+	clear_timeout_entry();
+
 	if (ip_hdr->ip_src.s_addr == addr.s_addr) { // INBOUND
 		inet_aton("10.0.28.2",&addr);
 		ip_hdr->ip_dst = addr;
@@ -84,7 +93,15 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		//TODO: print NAT TABLE
 
 	} else { //OUTBOUND
+		if (syn){
+			int port;
+			for (port = start_port; port <= end_port; port++){
+				if (table[port].src_port == 0) { // valid
+					table[port].src = ip_hdr->ip_src;
 
+				}
+			}
+		}
 		ip_hdr->ip_src = addr;
 
 	}
