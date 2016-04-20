@@ -120,9 +120,9 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	// print the timestamp (PC: seems the timestamp is not always set)
 	struct timeval tv;
 	/*if (!nfq_get_timestamp(pkt, &tv)) {
-		//		printf("  timestamp: %lu.%lu\n", tv.tv_sec, tv.tv_usec);
+	//		printf("  timestamp: %lu.%lu\n", tv.tv_sec, tv.tv_usec);
 	} else {
-		printf("  timestamp: nil\n");
+	printf("  timestamp: nil\n");
 	}*/
 	gettimeofday(&tv, NULL);
 	printf("creating timeval at %ld seconds\n", tv.tv_sec);
@@ -191,37 +191,21 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		if (p <= end_port){ // EXIST PAIR
 			tcp_hdr->source = htons(p);
 
-		}else{
-			if (tcp_hdr->syn == 1){ // IS SYN PACKET
-				puts("SYN");
-				int port;
-				for (port = start_port; port <= end_port; port++){
-					if (table[port].src_port == 0) { // valid
-						table[port].src = ip_hdr->ip_src;
-						table[port].src_port = ntohs(tcp_hdr->source);
-						table[port].tv = tv;
-						tcp_hdr->source = htons(port);
-						break;
-					}
-				}
-			} else { // NOT SYN PACKET
-				puts("NOT SYN");
-
-				//TODO: FIN PACKET
-
-				int port;
-				for (port = start_port; port <= end_port; port++){
-					if (table[port].src.s_addr == ip_hdr->ip_src.s_addr && table[port].src_port == ntohs(tcp_hdr->source)) {
-						break;
-					}
-				}
-				if (port > end_port) { // NOT IN TABLE
-					verdict = NF_DROP;
-				} else { // IN TABLE
+		}else if (tcp_hdr->syn == 1){ // NO PAIR AND IS SYN
+			puts("SYN");
+			int port;
+			for (port = start_port; port <= end_port; port++){
+				if (table[port].src_port == 0) { // valid
+					table[port].src = ip_hdr->ip_src;
+					table[port].src_port = ntohs(tcp_hdr->source);
+					table[port].tv = tv;
 					tcp_hdr->source = htons(port);
+					break;
 				}
-
 			}
+		}else{ // NO PAIR AND NO SYN
+			verdict = NF_DROP;
+
 		}
 		ip_hdr->ip_src = addr;
 
