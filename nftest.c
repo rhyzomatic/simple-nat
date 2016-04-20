@@ -60,6 +60,10 @@ void print_table(){
 
 }
 
+void remove_entry(int port){
+	memset(&table[port], 0, sizeof(struct natent));
+}
+
 /*
  * Callback function installed to netfilter queue
  */
@@ -130,7 +134,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 			verdict = NF_DROP;
 		}
 	} else { //OUTBOUND
-		if (tcp_hdr->syn == 1){ // IS SYN PACKET
+		if (ntohs(tcp_hdr->syn) == 1){ // IS SYN PACKET
 			int port;
 			for (port = start_port; port <= end_port; port++){
 				if (table[port].src_port == 0) { // valid
