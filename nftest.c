@@ -28,6 +28,10 @@ struct natent{
 	struct in_addr src;	
 	//	int dst_port;
 	struct timeval tv;
+	int ext_fin_state;
+	int ext_fin_seq;
+	int cli_fin_state;
+	int cli_fin_seq;
 } table[65536];
 
 struct in_addr pub_ip, int_ip;
@@ -183,6 +187,28 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 				puts("RST!");
 				remove_entry(port);
 			}
+			else{
+				if (tcp_hdr->fin == 1){ //INBOUND FIN
+					puts("INBOUND FIN");
+					table[port].ext_fin_state = 1;
+					table[port].ext_fin_seq = ntohs(tcp_hdr->seq);
+				}
+				
+				printf("ACK=%d, cli_fin_seq=%d\n", ntohs(tcp_hdr->ack_seq), table[port].cli_fin_seq);
+
+				if ((table[port].cli_fin_state == 1) && (ntohs(tcp_hdr->ack_seq) == table[port].cli_fin_seq)){
+					puts("EXT HAS ACK'ed CLIENT FIN");
+					table[port].cli_fin_state = 2; //ext has ack'ed client fin
+
+					if ((table[port].cli_fin_state == 2) && (table[port].ext_fin_state == 2)){
+						//FIN SEQUENCE COMPLETE, CAN DROP ENTRY
+						puts("DROPPING ENTRY B/C CLI AND EXT ACK'ed FINS");
+						remove_entry(port);
+					}
+				}
+
+			}
+
 		} else { // NOT IN PORT RANGE
 			puts("NOT IN PORT RANGE");
 			verdict = NF_DROP;
@@ -203,6 +229,24 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 			if (tcp_hdr->rst == 1){
 				puts("RST!");
 				remove_entry(p);
+			}
+			else {
+				if (tcp_hdr->fin == 1){ //OUTBOUND FIN
+					puts("OUTBOUND FIN");
+					table[p].cli_fin_state = 1;
+					table[p].cli_fin_seq = ntohs(tcp_hdr->seq);
+				}
+
+				if ((table[p].ext_fin_state == 1) && (ntohs(tcp_hdr->ack_seq) == table[p].ext_fin_seq)){
+					puts("CLIENT ACK'ed EXT FIN");
+					table[p].ext_fin_state = 2; //client has ack'ed ext fin
+
+					if ((table[p].ext_fin_state == 2) && (table[p].cli_fin_state == 2)){
+						//FIN SEQUENCE COMPLETE, CAN DROP ENTRY
+						puts("DROPPING ENTRY B/C CLI AND EXT ACK'ed FINS");
+						remove_entry(p);
+					}
+				}
 			}
 
 		}else if (tcp_hdr->syn == 1){ // NO PAIR AND IS SYN
@@ -249,6 +293,8 @@ int main(int argc, char **argv) {
 		printf("Usage: %s <public ip> <internal ip> <subnet mask>\n",argv[0]);
 		return 0;
 	}
+
+	puts("hi...");
 
 	inet_aton(argv[1],&pub_ip);
 	strcpy(pub_ip_str,inet_ntoa(pub_ip));
