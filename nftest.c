@@ -154,10 +154,8 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	struct tcphdr * tcp_hdr = (struct tcphdr*) ((unsigned char*)pktData + (ip_hdr->ip_hl << 2));
 
 	puts("   BEFORE TRANSLATION---");
-	printf("   src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
-	printf("   dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
-	printf("   src port=%d\n",ntohs(tcp_hdr->source));
-	printf("   dst port=%d\n",ntohs(tcp_hdr->dest));
+	printf("   src=%s:%d\n",inet_ntoa(ip_hdr->ip_src),ntohs(tcp_hdr->source));
+	printf("   dest=%s:%d\n",inet_ntoa(ip_hdr->ip_dst),ntohs(tcp_hdr->dest));
 
 //	struct in_addr addr;
 
@@ -176,12 +174,15 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		//TODO: 4-way handshake
 		//TODO: RST packet detection
 		//TODO: handle timeout
-		//TODO: program argument and usage
 		int port = ntohs(tcp_hdr->dest);
 		if (port >= start_port && port <= end_port && table[port].src_port != 0){
 			table[port].tv = tv; // UPDATE TIMESTAMP
 			ip_hdr->ip_dst = table[port].src;
 			tcp_hdr->dest = htons(table[port].src_port);
+			if (tcp_hdr->rst == 1){
+				puts("RST!");
+				remove_entry(port);
+			}
 		} else { // NOT IN PORT RANGE
 			puts("NOT IN PORT RANGE");
 			verdict = NF_DROP;
@@ -199,6 +200,10 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		if (p <= end_port){ // EXIST PAIR
 			tcp_hdr->source = htons(p);
 			table[p].tv = tv; // UPDATE TIMESTAMP
+			if (tcp_hdr->rst == 1){
+				puts("RST!");
+				remove_entry(p);
+			}
 
 		}else if (tcp_hdr->syn == 1){ // NO PAIR AND IS SYN
 			puts("SYN");
@@ -227,10 +232,8 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	//ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr,20);
 	tcp_hdr->check = tcp_checksum((unsigned char *)ip_hdr);
 	puts("   AFTER---");
-	printf("   src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
-	printf("   dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
-	printf("   src port=%d\n",ntohs(tcp_hdr->source));
-	printf("   dst port=%d\n",ntohs(tcp_hdr->dest));
+	printf("   src=%s:%d\n",inet_ntoa(ip_hdr->ip_src),ntohs(tcp_hdr->source));
+	printf("   dest=%s:%d\n",inet_ntoa(ip_hdr->ip_dst),ntohs(tcp_hdr->dest));
 
 	// For this program we'll always accept the packet...
 	return nfq_set_verdict(myQueue, id, verdict, len, (unsigned char *)ip_hdr);
