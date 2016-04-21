@@ -30,6 +30,10 @@ struct natent{
 	struct timeval tv;
 } table[65536];
 
+struct in_addr pub_ip, int_ip;
+struct in_addr lan;
+int mask;
+
 #define start_port 10000
 #define end_port 12000
 
@@ -84,12 +88,12 @@ void clear_timeout_entries(){
 }
 
 void print_table(){
-	printf("%15s%10s%15s%10s\n","SRC IP","SRC PORT","DEST IP", "DEST PORT");
-	printf("--------------------------------------------------------------------\n");
+	printf("%15s%15s%15s%15s%32s\n","SRC IP","SRC PORT","DEST IP", "DEST PORT","TIMEOUT");
+	printf("--------------------------------------------------------------------------------------------\n");
 	int port;
 	for (port = start_port; port <= end_port; port++){
 		if (table[port].src_port > 0) {
-			printf("%15s%10d%15s%10d\n", inet_ntoa(table[port].src),table[port].src_port,"10.0.28.1",port);
+			printf("%15s%15d%15s%15d%25ld.%06ld\n", inet_ntoa(table[port].src),table[port].src_port,inet_ntoa(pub_ip),port,table[port].tv.tv_sec,table[port].tv.tv_usec);
 		}
 	}
 
@@ -105,7 +109,9 @@ void remove_entry(int port){
  */
 static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg, 
 		nfq_data* pkt, void *cbData) {
-	printf("----\n----\n----\n");
+	printf("=====================================================================================================\n");
+	printf("=====================================================================================================\n");
+	printf("=====================================================================================================\n");
 	unsigned int id = 0;
 	nfqnl_msg_packet_hdr *header;
 
@@ -145,25 +151,25 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	struct ip* ip_hdr = (struct ip*) pktData;
 	struct tcphdr * tcp_hdr = (struct tcphdr*) ((unsigned char*)pktData + (ip_hdr->ip_hl << 2));
 
-	puts("BEFORE TRANSLATION---");
-	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
-	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
-	printf("src port=%d\n",ntohs(tcp_hdr->source));
-	printf("dst port=%d\n",ntohs(tcp_hdr->dest));
+	puts("   BEFORE TRANSLATION---");
+	printf("   src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
+	printf("   dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
+	printf("   src port=%d\n",ntohs(tcp_hdr->source));
+	printf("   dst port=%d\n",ntohs(tcp_hdr->dest));
 
-	struct in_addr addr;
+//	struct in_addr addr;
 
 	//clear timed out entries
 	clear_timeout_entries();
 
 
-	inet_aton("10.3.1.28",&addr);//TODO:HACK
-	//int mask_int = atoi(subnet_mask);
-	//unsigned int local_mask = 0xffffffff << (32 – mask_int);
+//	inet_aton("10.3.1.28",&addr);//TODO:HACK
+	unsigned int local_mask = 0xffffffff << (32 - mask);
 	u_int32_t verdict = NF_ACCEPT;
-	if (ip_hdr->ip_dst.s_addr == addr.s_addr) { // INBOUND
+	//if (ip_hdr->ip_dst.s_addr == addr.s_addr) { // INBOUND
+	if ((ntohl(ip_hdr->ip_src.s_addr) & local_mask) != ntohl(lan.s_addr)){ // INBOUND
 		puts("INBOUND");
-		inet_aton("10.0.28.1",&addr);
+//		inet_aton("10.0.28.1",&addr);
 
 		//TODO: 4-way handshake
 		//TODO: RST packet detection
@@ -179,7 +185,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 			verdict = NF_DROP;
 		}
 	} else { //OUTBOUND
-		inet_aton("10.3.1.28",&addr);
+//		inet_aton("10.3.1.28",&addr);
 		puts("OUTBOUND");
 		int p;
 		for (p = start_port; p <= end_port; p++){
@@ -208,27 +214,21 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 			verdict = NF_DROP;
 
 		}
-		ip_hdr->ip_src = addr;
+		ip_hdr->ip_src = pub_ip;
 
 	}
 
-
-	//tcp_hdr->src_port
-	//tcp_hdr->dst_port
-
 	print_table();
-
-	//printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
 
 	// fix checksums
 	ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr);
 	//ip_hdr->ip_sum = ip_checksum((unsigned char *)ip_hdr,20);
 	tcp_hdr->check = tcp_checksum((unsigned char *)ip_hdr);
-	puts("AFTER---");
-	printf("src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
-	printf("dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
-	printf("src port=%d\n",ntohs(tcp_hdr->source));
-	printf("dst port=%d\n",ntohs(tcp_hdr->dest));
+	puts("   AFTER---");
+	printf("   src ip=%s\n",inet_ntoa(ip_hdr->ip_src));
+	printf("   dest ip=%s\n",inet_ntoa(ip_hdr->ip_dst));
+	printf("   src port=%d\n",ntohs(tcp_hdr->source));
+	printf("   dst port=%d\n",ntohs(tcp_hdr->dest));
 
 	// For this program we'll always accept the packet...
 	return nfq_set_verdict(myQueue, id, verdict, len, (unsigned char *)ip_hdr);
@@ -240,6 +240,17 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
  * Main program
  */
 int main(int argc, char **argv) {
+	if (argc!=4) {
+		printf("Usage: %s <public ip> <internal ip> <subnet mask>\n",argv[0]);
+		return 0;
+	}
+
+	inet_aton(argv[1],&pub_ip);
+	inet_aton(argv[2],&int_ip);
+	mask = atoi(argv[3]);
+	unsigned int local_mask = 0xffffffff << (32 - mask);
+	lan.s_addr = htonl(ntohl(int_ip.s_addr) & local_mask);
+
 	struct nfq_handle *nfqHandle;
 
 	struct nfq_q_handle *myQueue;
