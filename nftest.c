@@ -27,7 +27,7 @@ struct natent{
 	int src_port;
 	struct in_addr src;	
 	//	int dst_port;
-	struct timeval tv;
+	double ts;
 	int ext_fin_state;
 	int ext_fin_seq;
 	int cli_fin_state;
@@ -77,15 +77,14 @@ uint16_t ip_checksum(void* vdata,size_t length) {
 void clear_timeout_entries(){
 	struct timeval now;
 	gettimeofday(&now, NULL);
+	double now_ts = now.tv_sec + (double) now.tv_usec / 1000000;
 
 	int entry;
 	for (entry = start_port; entry <= end_port; entry++){
 		if (table[entry].src_port > 0){
-			if (now.tv_sec - table[entry].tv.tv_sec > 30){
+			if (now_ts - table[entry].ts > 30){
 				// delete entry
 				printf("deleting entry\n");
-				printf("now: %ld then: %ld\n", now.tv_sec, table[entry].tv.tv_sec);
-				printf("seconds difference: %d\n", (int) (now.tv_sec - table[entry].tv.tv_sec));
 				memset(&table[entry], 0, sizeof(struct natent));
 			}
 		}
@@ -98,7 +97,7 @@ void print_table(){
 	int port;
 	for (port = start_port; port <= end_port; port++){
 		if (table[port].src_port > 0) {
-			printf("%15s%15d%15s%15d%25ld.%06ld\n", inet_ntoa(table[port].src),table[port].src_port,pub_ip_str,port,table[port].tv.tv_sec,table[port].tv.tv_usec);
+			printf("%15s%15d%15s%15d%25f\n", inet_ntoa(table[port].src),table[port].src_port,pub_ip_str,port,table[port].ts);
 		}
 	}
 	printf("\n\n");
@@ -138,6 +137,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 	}*/
 	gettimeofday(&tv, NULL);
 	printf("creating timeval at %ld seconds\n", tv.tv_sec);
+	double ts = tv.tv_sec + (double) tv.tv_usec / 1000000;
 
 	// Print the payload; in copy meta mode, only headers will be
 	// included; in copy packet mode, whole packet will be returned.
@@ -180,7 +180,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 		//TODO: handle timeout
 		int port = ntohs(tcp_hdr->dest);
 		if (port >= start_port && port <= end_port && table[port].src_port != 0){
-			table[port].tv = tv; // UPDATE TIMESTAMP
+			table[port].ts = ts; // UPDATE TIMESTAMP
 			ip_hdr->ip_dst = table[port].src;
 			tcp_hdr->dest = htons(table[port].src_port);
 			if (tcp_hdr->rst == 1){
@@ -225,7 +225,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 
 		if (p <= end_port){ // EXIST PAIR
 			tcp_hdr->source = htons(p);
-			table[p].tv = tv; // UPDATE TIMESTAMP
+			table[p].ts = ts; // UPDATE TIMESTAMP
 			if (tcp_hdr->rst == 1){
 				puts("RST!");
 				remove_entry(p);
@@ -256,7 +256,7 @@ static int Callback(nfq_q_handle* myQueue, struct nfgenmsg* msg,
 				if (table[port].src_port == 0) { // valid
 					table[port].src = ip_hdr->ip_src;
 					table[port].src_port = ntohs(tcp_hdr->source);
-					table[port].tv = tv; // UPDATE TIMESTAMP
+					table[port].ts = ts; // UPDATE TIMESTAMP
 					tcp_hdr->source = htons(port);
 					break;
 				}
