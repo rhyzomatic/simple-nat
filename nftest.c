@@ -33,6 +33,7 @@ struct natent{
 struct in_addr pub_ip, int_ip;
 struct in_addr lan;
 int mask;
+char pub_ip_str[20];
 
 #define start_port 10000
 #define end_port 12000
@@ -93,9 +94,10 @@ void print_table(){
 	int port;
 	for (port = start_port; port <= end_port; port++){
 		if (table[port].src_port > 0) {
-			printf("%15s%15d%15s%15d%25ld.%06ld\n", inet_ntoa(table[port].src),table[port].src_port,inet_ntoa(pub_ip),port,table[port].tv.tv_sec,table[port].tv.tv_usec);
+			printf("%15s%15d%15s%15d%25ld.%06ld\n", inet_ntoa(table[port].src),table[port].src_port,pub_ip_str,port,table[port].tv.tv_sec,table[port].tv.tv_usec);
 		}
 	}
+	printf("\n\n");
 
 }
 
@@ -246,6 +248,7 @@ int main(int argc, char **argv) {
 	}
 
 	inet_aton(argv[1],&pub_ip);
+	strcpy(pub_ip_str,inet_ntoa(pub_ip));
 	inet_aton(argv[2],&int_ip);
 	mask = atoi(argv[3]);
 	unsigned int local_mask = 0xffffffff << (32 - mask);
